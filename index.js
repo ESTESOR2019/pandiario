@@ -9,23 +9,20 @@ const app = express();
 let versiculosLista = [];
 
 // ==========================================
-// Middleware de CORS para Vercel y Localhost
+// Middleware de CORS Global e Inyección Directa
 // ==========================================
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Accept');
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
 
-  // Responder inmediatamente a las solicitudes Preflight (OPTIONS)
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   next();
 });
 
-// ==========================================
-// Configuración de Swagger / OpenAPI
-// ==========================================
+// Configuración Swagger UI
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -45,7 +42,6 @@ const swaggerOptions = {
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
 const swaggerUiOptions = {
   customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui.min.css',
   customJs: [
@@ -56,9 +52,7 @@ const swaggerUiOptions = {
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 
-// ==========================================
-// Lógica de Datos
-// ==========================================
+// Carga de Datos
 function procesarBiblia(data) {
   const lista = [];
   if (!data || !data.books) return lista;
@@ -103,27 +97,12 @@ function obtenerIndicePorFecha(fechaStr, totalItems) {
   return Math.abs(hash) % totalItems;
 }
 
-// ==========================================
-// Endpoints y JSDoc
-// ==========================================
-
-/**
- * @openapi
- * /api/pan-diario:
- *   get:
- *     summary: Obtiene el versículo del día
- *     parameters:
- *       - in: query
- *         name: fecha
- *         schema:
- *           type: string
- *           example: "2026-09-17"
- *         description: Fecha en formato YYYY-MM-DD
- *     responses:
- *       200:
- *         description: Éxito
- */
+// Endpoint Principal
 app.get('/api/pan-diario', (req, res) => {
+  // Aseguramos los encabezados explícitamente en la respuesta
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
   garantizarDatos();
 
   if (versiculosLista.length === 0) {
@@ -134,7 +113,7 @@ app.get('/api/pan-diario', (req, res) => {
   const indice = obtenerIndicePorFecha(fecha, versiculosLista.length);
   const versiculoSeleccionado = versiculosLista[indice];
 
-  res.json({
+  return res.json({
     fecha: fecha,
     panDiario: versiculoSeleccionado
   });
@@ -144,6 +123,5 @@ app.get('/', (req, res) => {
   res.redirect('/api-docs');
 });
 
-// Exportación requerida para Vercel
 module.exports = app;
 module.exports.handler = serverless(app);
