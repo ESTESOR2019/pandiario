@@ -8,6 +8,14 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const app = express();
 let versiculosLista = [];
 
+// 2. Habilitar CORS para permitir solicitudes desde tu sitio web
+app.use(cors({
+  origin: '*', // Permite consultas desde cualquier origen (o puedes poner 'https://manantial-bendiciones.vercel.app')
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+
 // ==========================================
 // Configuración de Swagger / OpenAPI
 // ==========================================
