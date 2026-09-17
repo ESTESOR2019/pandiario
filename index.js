@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const serverless = require('serverless-http');
@@ -9,20 +10,20 @@ const app = express();
 let versiculosLista = [];
 
 // ==========================================
-// Middleware de CORS Global e Inyección Directa
+// Configuración de CORS Oficial para Serverless
 // ==========================================
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
+// Responder solicitudes Preflight inmediatamente
+app.options('*', cors());
 
+// ==========================================
 // Configuración Swagger UI
+// ==========================================
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -52,7 +53,9 @@ const swaggerUiOptions = {
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 
-// Carga de Datos
+// ==========================================
+// Lógica de Carga de Datos
+// ==========================================
 function procesarBiblia(data) {
   const lista = [];
   if (!data || !data.books) return lista;
@@ -97,12 +100,10 @@ function obtenerIndicePorFecha(fechaStr, totalItems) {
   return Math.abs(hash) % totalItems;
 }
 
-// Endpoint Principal
+// ==========================================
+// Endpoints
+// ==========================================
 app.get('/api/pan-diario', (req, res) => {
-  // Aseguramos los encabezados explícitamente en la respuesta
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-
   garantizarDatos();
 
   if (versiculosLista.length === 0) {
