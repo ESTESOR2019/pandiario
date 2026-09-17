@@ -1,6 +1,11 @@
 {
+  "name": "api-pandiario",
+  "version": "1.0.0",
+  "main": "index.js",
   "dependencies": {
-    "swagger-jsdoc": "^6.3.0",
+    "express": "^4.19.2",
+    "serverless-http": "^3.2.0",
+    "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   }
 }
