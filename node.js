@@ -2,35 +2,72 @@ const express = require('express');
 const app = express();
 const PORT = 3000;
 
-const JSON_URL = 'https://mrk214.github.io/snapshots/es___spa___spa/NTV_vid_127.json';
+const JSON_URL = 'RVR1960.json';
 
-// Variable para almacenar en memoria el JSON y no descargarlo en cada request
-let bibliaData = null;
+let versiculosLista = [];
 
-// Función para cargar los datos al iniciar el servidor
+// Extrae todos los versículos en un array plano de objetos fácil de consumir
+function procesarBiblia(data) {
+  const lista = [];
+  
+  if (!data.books) return lista;
+
+  data.books.forEach(libro => {
+    libro.chapters.forEach(capitulo => {
+      capitulo.items.forEach(item => {
+        if (item.type === 'verse' && item.lines && item.lines.length > 0) {
+          lista.push({
+            libro: libro.name,
+            capitulo: capitulo.current.human,
+            versiculo: item.verse_numbers.join('-'),
+            texto: item.lines.join(' ')
+          });
+        }
+      });
+    });
+  });
+
+  return lista;
+}
+
+// Carga y procesa los datos al arrancar el servidor
 async function cargarDatos() {
   try {
     const respuesta = await fetch(JSON_URL);
-    bibliaData = await respuesta.json();
-    console.log('JSON cargado correctamente desde la URL.');
+    const bibliaData = await respuesta.json();
+    versiculosLista = procesarBiblia(bibliaData);
+    console.log(`Biblia procesada correctamente. Total de versículos: ${versiculosLista.length}`);
   } catch (error) {
-    console.error('Error al descargar el JSON:', error);
+    console.error('Error al descargar o procesar el JSON:', error);
   }
 }
 
-// Endpoint para el Pan Diario (Aleatorio)
-app.get('/api/pan-diario/aleatorio', (req, res) => {
-  if (!bibliaData) {
+// Función hash simple para convertir la cadena de fecha a un número entero
+function obtenerIndicePorFecha(fechaStr, totalItems) {
+  let hash = 0;
+  for (let i = 0; i < fechaStr.length; i++) {
+    hash = (hash << 5) - hash + fechaStr.charCodeAt(i);
+    hash |= 0; // Convertir a entero de 32 bits
+  }
+  return Math.abs(hash) % totalItems;
+}
+
+// Endpoint para el Pan Diario por fecha
+// Permite consulta opcional: /api/pan-diario?fecha=2026-09-17
+app.get('/api/pan-diario', (req, res) => {
+  if (versiculosLista.length === 0) {
     return res.status(503).json({ error: 'Los datos aún no están listos' });
   }
 
-  // Ajusta la selección según la estructura interna que tenga ese JSON específico
-  // Si es un array:
-  const indiceAleatorio = Math.floor(Math.random() * bibliaData.length);
-  const versiculo = bibliaData[indiceAleatorio];
+  // Si no se envía la fecha como query param, se usa la fecha actual UTC (YYYY-MM-DD)
+  const fecha = req.query.fecha || new Date().toISOString().split('T')[0];
+
+  const indice = obtenerIndicePorFecha(fecha, versiculosLista.length);
+  const versiculoSeleccionado = versiculosLista[indice];
 
   res.json({
-    panDiario: versiculo
+    fecha: fecha,
+    panDiario: versiculoSeleccionado
   });
 });
 
