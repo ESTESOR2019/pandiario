@@ -1,5 +1,7 @@
 const express = require('express');
 const fs = require('fs');
+const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const serverless = require('serverless-http');
 const swaggerUi = require('swagger-ui-express');
@@ -7,28 +9,6 @@ const swaggerJsdoc = require('swagger-jsdoc');
 
 const app = express();
 let versiculosLista = [];
-
-// ==========================================
-// Middleware Nativo para Encabezados CORS
-// ==========================================
-app.use((req, res, next) => {
-  // Permite peticiones desde cualquier origen (o tu dominio exacto de Vercel)
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-
-  // Responder de inmediato a las solicitudes preflight tipo OPTIONS
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  next();
-});
-
-// Resto de tu código (garantizarDatos, app.get('/api/pan-diario'), etc.)
-
-
-
 // ==========================================
 // Configuración de Swagger / OpenAPI
 // ==========================================
