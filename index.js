@@ -1,7 +1,5 @@
 const express = require('express');
 const fs = require('fs');
-const express = require('express');
-const fs = require('fs');
 const path = require('path');
 const serverless = require('serverless-http');
 const swaggerUi = require('swagger-ui-express');
@@ -9,6 +7,22 @@ const swaggerJsdoc = require('swagger-jsdoc');
 
 const app = express();
 let versiculosLista = [];
+
+// ==========================================
+// Middleware de CORS para Vercel y Localhost
+// ==========================================
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Accept');
+
+  // Responder inmediatamente a las solicitudes Preflight (OPTIONS)
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
 // ==========================================
 // Configuración de Swagger / OpenAPI
 // ==========================================
@@ -32,7 +46,6 @@ const swaggerOptions = {
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
-// Configuración de Swagger UI usando CDN para evitar 404 de archivos estáticos en Vercel
 const swaggerUiOptions = {
   customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui.min.css',
   customJs: [
