@@ -1,16 +1,49 @@
 const express = require('express');
-const app = express();
-const PORT = 3000;
+const fs = require('fs');
+const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
 
-const JSON_URL = 'RVR1960.json';
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 let versiculosLista = [];
 
-// Extrae todos los versículos en un array plano de objetos fácil de consumir
+// ==========================================
+// Configuración de Swagger / OpenAPI
+// ==========================================
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'API Pan Diario Bíblico',
+      version: '1.0.0',
+      description: 'API para obtener un versículo de la Biblia por fecha utilizando un algoritmo determinista (Hash).'
+    },
+    servers: [
+      {
+        url: 'http://localhost:3000',
+        description: 'Servidor Local'
+      },
+      {
+        url: 'https://api-pandiario.vercel.app',
+        description: 'Servidor de Producción (Vercel)'
+      }
+    ]
+  },
+  apis: [__filename] // Genera la documentación leyendo los comentarios JSDoc de este mismo archivo
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// ==========================================
+// Funciones de Procesamiento de la Biblia
+// ==========================================
+
 function procesarBiblia(data) {
   const lista = [];
-  
-  if (!data.books) return lista;
+  if (!data || !data.books) return lista;
 
   data.books.forEach(libro => {
     libro.chapters.forEach(capitulo => {
@@ -30,38 +63,85 @@ function procesarBiblia(data) {
   return lista;
 }
 
-// Carga y procesa los datos al arrancar el servidor
-async function cargarDatos() {
-  try {
-    const respuesta = await fetch(JSON_URL);
-    const bibliaData = await respuesta.json();
-    versiculosLista = procesarBiblia(bibliaData);
-    console.log(`Biblia procesada correctamente. Total de versículos: ${versiculosLista.length}`);
-  } catch (error) {
-    console.error('Error al descargar o procesar el JSON:', error);
+// Carga sincrónica/directa compatible con Serverless (Vercel) y lectura de archivo local
+function garantizarDatos() {
+  if (versiculosLista.length === 0) {
+    try {
+      const jsonPath = path.join(__dirname, 'RVR1960.json');
+      const rawData = fs.readFileSync(jsonPath, 'utf8');
+      const bibliaData = JSON.parse(rawData);
+      versiculosLista = procesarBiblia(bibliaData);
+      console.log(`Biblia cargada correctamente. Total versículos: ${versiculosLista.length}`);
+    } catch (error) {
+      console.error('Error al cargar RVR1960.json local:', error);
+    }
   }
 }
 
-// Función hash simple para convertir la cadena de fecha a un número entero
 function obtenerIndicePorFecha(fechaStr, totalItems) {
   let hash = 0;
   for (let i = 0; i < fechaStr.length; i++) {
     hash = (hash << 5) - hash + fechaStr.charCodeAt(i);
-    hash |= 0; // Convertir a entero de 32 bits
+    hash |= 0;
   }
   return Math.abs(hash) % totalItems;
 }
 
-// Endpoint para el Pan Diario por fecha
-// Permite consulta opcional: /api/pan-diario?fecha=2026-09-17
+// ==========================================
+// Documentación JSDoc Endpoint Pan Diario
+// ==========================================
+
+/**
+ * @openapi
+ * /api/pan-diario:
+ *   get:
+ *     summary: Obtiene el versículo del día (Pan Diario)
+ *     description: Retorna un versículo bíblico único asociativo según la fecha enviada o la fecha actual UTC.
+ *     parameters:
+ *       - in: query
+ *         name: fecha
+ *         schema:
+ *           type: string
+ *           example: "2026-09-17"
+ *         required: false
+ *         description: Fecha en formato YYYY-MM-DD para calcular el versículo asignado a ese día.
+ *     responses:
+ *       200:
+ *         description: Éxito
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 fecha:
+ *                   type: string
+ *                   example: "2026-09-17"
+ *                 panDiario:
+ *                   type: object
+ *                   properties:
+ *                     libro:
+ *                       type: string
+ *                       example: "Génesis"
+ *                     capitulo:
+ *                       type: string
+ *                       example: "Génesis 1"
+ *                     versiculo:
+ *                       type: string
+ *                       example: "1"
+ *                     texto:
+ *                       type: string
+ *                       example: "En el principio creó Dios los cielos y la tierra."
+ *       503:
+ *         description: Servicio no disponible por fallo al cargar el JSON
+ */
 app.get('/api/pan-diario', (req, res) => {
+  garantizarDatos();
+
   if (versiculosLista.length === 0) {
-    return res.status(503).json({ error: 'Los datos aún no están listos' });
+    return res.status(503).json({ error: 'Los datos de la Biblia no se pudieron cargar.' });
   }
 
-  // Si no se envía la fecha como query param, se usa la fecha actual UTC (YYYY-MM-DD)
   const fecha = req.query.fecha || new Date().toISOString().split('T')[0];
-
   const indice = obtenerIndicePorFecha(fecha, versiculosLista.length);
   const versiculoSeleccionado = versiculosLista[indice];
 
@@ -71,7 +151,17 @@ app.get('/api/pan-diario', (req, res) => {
   });
 });
 
-app.listen(PORT, async () => {
-  await cargarDatos();
-  console.log(`API corriendo en http://localhost:${PORT}`);
+// Endpoint base que redirige automáticamente a la documentación
+app.get('/', (req, res) => {
+  res.redirect('/api-docs');
 });
+
+// Escuchar puerto en local
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    garantizarDatos();
+    console.log(`API y SwaggerUI ejecutándose en http://localhost:${PORT}/api-docs`);
+  });
+}
+
+module.exports = app;
